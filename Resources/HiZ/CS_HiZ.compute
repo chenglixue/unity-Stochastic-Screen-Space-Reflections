@@ -1,0 +1,28 @@
+#include "Assets/Materials/Common.hlsl"
+
+#pragma kernel GetHiZ
+
+Texture2D<float4>   _SourceTex;
+RWTexture2D<float4> _RW_OutputTex;
+
+// xy: last mipmap's texel size;
+// zw: curr mipmap's texel size
+float4 _HiZTexSize;
+
+float SampleSourceTex(float2 uv, float2 offset)
+{
+    return _SourceTex.SampleLevel(Smp_ClampU_ClampV_Linear, uv + offset * _HiZTexSize.xy, 0).r;
+}
+
+[numthreads(8,8,1)]
+void GetHiZ (uint3 id : SV_DispatchThreadID)
+{
+    float2 uv = (float2(id.xy) + 0.5f) * _HiZTexSize.zw;
+    float minZ = SampleSourceTex(uv, 0);
+    minZ = max(minZ, SampleSourceTex(uv, float2(-1.f, -1.f)));
+    minZ = max(minZ, SampleSourceTex(uv, float2(-1.f, 1.f)));
+    minZ = max(minZ, SampleSourceTex(uv, float2(1.f, 1.f)));
+    minZ = max(minZ, SampleSourceTex(uv, float2(1.f, -1.f)));
+
+    _RW_OutputTex[id.xy] = minZ;
+}
